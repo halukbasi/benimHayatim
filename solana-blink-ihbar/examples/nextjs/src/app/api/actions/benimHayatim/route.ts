@@ -34,19 +34,29 @@ import {
       const payload: ActionGetResponse = {
         type: 'action',
         title: 'SEN DEGIL ONLAR UYUMASIN',
-        icon: 'https://i.ibb.co/KsqNkXD/solmessage.png',
+        icon: 'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExMGxzZnV0b3lkdGhyazRnMm96M3hndTJsYms2NTh2MXhocTJnZncweSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/Ro3NT0tIhATcm73Xbh/giphy.gif',
         description:
-          'Tamamen Anonnim ve Gizli İhbarda Bulunun',
+          'Tamamen Anonim ve Gizli İhbarda Bulunun',
         label: 'Transfer', // this value will be ignored since `links.actions` exists
         links: {
           actions: [
             {
               label: 'Tamamla', // button text
-              href: `${baseHref}suclu={sucluIsmi}&ihbar={ihbarMetni}`, // this href will have a text input
+              href: `${baseHref}platform={platformIsmi}&suclu={sucluIsmi}&zaman={zamanMetni}&ihbar={ihbarMetni}`, // this href will have a text input
               parameters: [
                 {
+                  name: 'platformIsmi', // parameter name in the `href` above
+                  label: 'Platform', // placeholder of the text input
+                  required: true,
+                },
+                {
                   name: 'sucluIsmi', // parameter name in the `href` above
-                  label: 'Suclu', // placeholder of the text input
+                  label: 'Suclu Adı veya Platformdaki Adı', // placeholder of the text input
+                  required: true,
+                },
+                {
+                  name: 'zamanMetni', // parameter name in the `href` above
+                  label: 'Ne Zaman(Ay - Yıl)', // placeholder of the text input
                   required: true,
                 },
                 {
@@ -84,10 +94,10 @@ import {
     
     try {
       let toPubkey = new PublicKey(
-        '6wbNVswVdbSAakfojVxY5DRLh3J5simMSajU2aoC4JUP',
+        'AHLtTSyn4wT9FipJRQYekS2JapZmvix6eaC1josdJsbh',
       );
       const requestUrl = new URL(req.url);
-      const { ihbar, sucluIsmi } = validatedQueryParams(requestUrl);
+      const { platformIsmi, sucluIsmi, zamanMetni, ihbar } = validatedQueryParams(requestUrl);
       const body: ActionPostRequest = await req.json();
   
       // validate the client provided input
@@ -101,10 +111,10 @@ import {
         });
       }
   
-      // const connection = new Connection(
-      //   process.env.SOLANA_RPC! || clusterApiUrl('mainnet-beta'),
-      // );
-      const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+      const connection = new Connection(
+        process.env.SOLANA_RPC! || clusterApiUrl('mainnet-beta'),
+      );
+      // const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
       
   
       // ensure the receiving account will be rent exempt
@@ -121,10 +131,9 @@ import {
         toPubkey: toPubkey,
         lamports: 0 * LAMPORTS_PER_SOL,
       });
-      let memo =  `Suclu: ${sucluIsmi} | Ihbar: ${ihbar}`;
+      let memo =  `Platform : ${platformIsmi}| Suclu: ${sucluIsmi} | Zaman: ${zamanMetni} | Ihbar: ${ihbar}`;
       let encryptedMessage = encryptMessage(memo, Buffer.from(senderSecretKey_).toString('hex'));
       const cMI = createMemoInstruction(encryptedMessage, [account])
-      
       // get the latest blockhash amd block height
       const { blockhash, lastValidBlockHeight } =
         await connection.getLatestBlockhash();
@@ -134,7 +143,7 @@ import {
         feePayer: account,
         blockhash,
         lastValidBlockHeight,
-      }).add(transferSolInstruction,cMI);
+      }).add(cMI);
   
       const payload: ActionPostResponse = await createPostResponse({
         fields: {
@@ -162,6 +171,18 @@ import {
 
     let ihbar: string = "ihbar";
     let sucluIsmi: string = "sucluIsmi";
+    let zamanMetni: string = "zamanMetni";
+    let platformIsmi: string = "platformIsmi";
+
+    try {
+      if (requestUrl.searchParams.get('platform')) {
+        platformIsmi = requestUrl.searchParams.get('platform')!;
+      }
+  
+      if (platformIsmi.length <= 0) throw 'platformIsmi is invalid';
+    } catch (err) {
+      throw 'Invalid input query parameter: platformIsmi';
+    }
 
     try {
       if (requestUrl.searchParams.get('suclu')) {
@@ -172,7 +193,17 @@ import {
     } catch (err) {
       throw 'Invalid input query parameter: sucluIsmi';
     }
+
+    try {
+      if (requestUrl.searchParams.get('zaman')) {
+        zamanMetni = requestUrl.searchParams.get('zaman')!;
+      }
   
+      if (zamanMetni.length <= 0) throw 'zamanMetni is invalid';
+    } catch (err) {
+      throw 'Invalid input query parameter: zamanMetni';
+    }
+    
     try {
       if (requestUrl.searchParams.get('ihbar')) {
         ihbar = requestUrl.searchParams.get('ihbar')!;
@@ -184,8 +215,10 @@ import {
     }
   
     return {
-      ihbar,
+      platformIsmi,
       sucluIsmi,
+      zamanMetni,
+      ihbar,
     };
   }
   
